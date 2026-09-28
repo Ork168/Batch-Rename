@@ -269,7 +269,13 @@
                     zip.file(data.finalName, data.originalFile);
                 });
                 
-                const content = await zip.generateAsync({ type: "blob" });
+                // 無圧縮(STORE)モードを指定して処理速度を大幅に向上 & 進捗(%)を表示
+                const content = await zip.generateAsync({ 
+                    type: "blob",
+                    compression: "STORE" 
+                }, (metadata) => {
+                    showLoading(`ZIPファイルを作成中... (${Math.round(metadata.percent)}%)`);
+                });
                 
                 // ダウンロードトリガー
                 const url = window.URL.createObjectURL(content);
