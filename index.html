@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>写真日付一括リネーム (Web版)</title>
+    <title>写真・動画 日付一括リネーム (Web版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- EXIF情報を読み取るためのライブラリ(exifr) -->
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
@@ -16,14 +16,14 @@
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6">
+    <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-6">
         <header class="mb-8 text-center">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">📸🎥 写真・動画 日付一括リネーム</h1>
             <p class="text-gray-500 text-sm">写真や動画のExif/メタデータ（撮影・作成日時）を読み取り、ファイル名を「YYYYMMDD_HHMMSS」形式に一括変換します。<br>※すべてブラウザ内で処理されるため、ファイルは外部に送信されず安全です。</p>
         </header>
 
         <!-- ドロップエリア -->
-        <div id="drop-zone" class="border-4 border-dashed border-gray-300 rounded-xl p-12 text-center transition-colors duration-200 cursor-pointer mb-8 hover:bg-gray-50">
+        <div id="drop-zone" class="border-4 border-dashed border-gray-300 rounded-xl p-10 text-center transition-colors duration-200 cursor-pointer mb-8 hover:bg-gray-50">
             <input type="file" id="file-input" multiple accept="image/*, video/*, .mp4, .mov, .avi, .mkv, .webm, .m4v, .3gp" class="hidden">
             <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" />
@@ -32,27 +32,43 @@
             <p class="text-sm text-gray-500">またはクリックしてファイルを選択 (JPG, PNG, HEIC, MP4, MOV 等)</p>
         </div>
 
-        <!-- コントロールパネル (ファイル読み込み後に表示) -->
-        <div id="control-panel" class="hidden mb-6 flex justify-between items-center bg-blue-50 p-4 rounded-lg">
-            <p class="text-blue-800 font-medium">読み込み完了: <span id="file-count">0</span>件</p>
-            <div class="flex gap-4">
-                <button id="clear-btn" class="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">クリア</button>
-                <button id="download-btn" class="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    リネームしてZIPで保存
+        <!-- コントロールパネル -->
+        <div id="control-panel" class="hidden mb-6 flex flex-col md:flex-row justify-between items-center bg-blue-50 p-4 rounded-xl gap-4">
+            <div>
+                <p class="text-blue-900 font-bold">読み込み完了: <span id="file-count">0</span> 件</p>
+                <p class="text-xs text-blue-700 mt-0.5">合計サイズ: <span id="total-size">0 MB</span></p>
+            </div>
+            <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+                <button id="clear-btn" class="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">
+                    クリア
+                </button>
+                <!-- フォルダ直接保存ボタン (FS Access API対応ブラウザ用) -->
+                <button id="save-folder-btn" class="hidden px-4 py-2 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    📁 フォルダに直接保存 (高速)
+                </button>
+                <!-- ZIP保存ボタン -->
+                <button id="download-zip-btn" class="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    📦 ZIPで保存
+                </button>
+                <!-- 個別保存ボタン -->
+                <button id="download-single-btn" class="px-3 py-2 bg-gray-200 text-gray-800 font-medium text-sm rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-1">
+                    📄 個別保存
                 </button>
             </div>
         </div>
 
-        <!-- ファイルリスト -->
+        <!-- ファイルリストテーブル -->
         <div id="file-list-container" class="hidden overflow-x-auto rounded-lg border border-gray-200">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">プレビュー</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">元のファイル名</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">撮影日時</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">新しいファイル名</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">プレビュー</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">元のファイル名</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ファイルサイズ</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">撮影/作成日時</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">新しいファイル名</th>
                     </tr>
                 </thead>
                 <tbody id="file-list-body" class="bg-white divide-y divide-gray-200">
@@ -61,13 +77,34 @@
             </table>
         </div>
         
-        <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden flex-col items-center justify-center z-50 text-white">
-            <svg class="animate-spin -ml-1 mr-3 h-12 w-12 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <!-- ローディングオーバーレイ -->
+        <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-60 hidden flex-col items-center justify-center z-50 text-white p-4">
+            <svg class="animate-spin h-12 w-12 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p id="loading-text" class="text-xl font-bold">処理中...</p>
+            <p id="loading-text" class="text-xl font-bold text-center">処理中...</p>
+            <p id="loading-subtext" class="text-sm text-gray-300 mt-2 text-center"></p>
         </div>
+
+        <!-- カスタム通知モーダル -->
+        <div id="notice-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl transform transition-all">
+                <div class="flex items-center gap-3 mb-4">
+                    <div id="notice-icon" class="p-2 rounded-full bg-red-100 text-red-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 id="notice-title" class="text-lg font-bold text-gray-900">通知</h3>
+                </div>
+                <p id="notice-message" class="text-sm text-gray-600 leading-relaxed mb-6"></p>
+                <div class="flex justify-end">
+                    <button id="notice-close-btn" class="px-5 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 transition-colors text-sm">
+                        閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -77,26 +114,47 @@
         const fileListContainer = document.getElementById('file-list-container');
         const fileListBody = document.getElementById('file-list-body');
         const fileCountSpan = document.getElementById('file-count');
+        const totalSizeSpan = document.getElementById('total-size');
         const clearBtn = document.getElementById('clear-btn');
-        const downloadBtn = document.getElementById('download-btn');
+        const saveFolderBtn = document.getElementById('save-folder-btn');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const downloadSingleBtn = document.getElementById('download-single-btn');
         const loadingOverlay = document.getElementById('loading-overlay');
         const loadingText = document.getElementById('loading-text');
+        const loadingSubtext = document.getElementById('loading-subtext');
+
+        // モーダル要素
+        const noticeModal = document.getElementById('notice-modal');
+        const noticeTitle = document.getElementById('notice-title');
+        const noticeMessage = document.getElementById('notice-message');
+        const noticeIcon = document.getElementById('notice-icon');
+        const noticeCloseBtn = document.getElementById('notice-close-btn');
 
         let fileDataList = [];
 
-        // 日付を YYYYMMDD_HHMMSS 形式に変換する関数
+        // Web File System Access API (showDirectoryPicker) に対応しているか確認
+        if ('showDirectoryPicker' in window) {
+            saveFolderBtn.classList.remove('hidden');
+        }
+
         function formatDate(date) {
             if (!date || isNaN(date.getTime())) return null;
             const pad = (n) => n.toString().padStart(2, '0');
             return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
         }
 
-        // ファイル拡張子を取得
         function getExtension(filename) {
             return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
         }
 
-        // ドラッグ＆ドロップイベントの設定
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
@@ -124,15 +182,12 @@
             }
         });
 
-        // ファイルの処理とExif解析
         async function processFiles(files) {
-            showLoading("ファイルの日付情報を解析中...");
+            showLoading("ファイルの日付情報を解析中...", "ファイル数によって少し時間がかかる場合があります");
             
             const newFiles = Array.from(files);
-            let processedCount = 0;
 
             for (const file of newFiles) {
-                // 画像または動画ファイルのみ対象
                 const isImage = file.type.startsWith('image/');
                 const isVideo = file.type.startsWith('video/');
                 if (!isImage && !isVideo) continue;
@@ -163,12 +218,13 @@
                 const dateStr = formatDate(dateObj);
                 const proposedName = dateStr ? `${dateStr}.${ext}` : file.name;
 
-                // サムネイル生成用のオブジェクトURL
+                // サムネイル生成用URL
                 const thumbUrl = URL.createObjectURL(file);
 
                 fileDataList.push({
                     originalFile: file,
                     originalName: file.name,
+                    size: file.size,
                     date: dateObj,
                     dateSource: dateSource,
                     proposedName: proposedName,
@@ -176,17 +232,14 @@
                     thumbUrl: thumbUrl,
                     isVideo: isVideo
                 });
-
-                processedCount++;
             }
 
             resolveNameCollisions();
             updateUI();
             hideLoading();
-            fileInput.value = ""; // リセット
+            fileInput.value = "";
         }
 
-        // 同一ファイル名の重複を回避 (末尾に_1, _2 を付ける)
         function resolveNameCollisions() {
             const nameCounts = {};
             
@@ -211,7 +264,6 @@
             });
         }
 
-        // UIの更新
         function updateUI() {
             if (fileDataList.length === 0) {
                 controlPanel.classList.add('hidden');
@@ -219,17 +271,20 @@
                 return;
             }
 
+            const totalBytes = fileDataList.reduce((acc, f) => acc + f.size, 0);
+
             fileCountSpan.textContent = fileDataList.length;
+            totalSizeSpan.textContent = formatBytes(totalBytes);
+
             controlPanel.classList.remove('hidden');
             fileListContainer.classList.remove('hidden');
             
             fileListBody.innerHTML = '';
             
-            fileDataList.forEach((data, index) => {
+            fileDataList.forEach((data) => {
                 const row = document.createElement('tr');
                 const dateDisplay = data.date ? data.date.toLocaleString() : '不明';
                 
-                // プレビュー表示（動画と画像で分岐）
                 const previewHtml = data.isVideo
                     ? `<video src="${data.thumbUrl}" class="h-12 w-12 object-cover rounded shadow-sm bg-black" muted preload="metadata"></video>`
                     : `<img src="${data.thumbUrl}" alt="preview" class="h-12 w-12 object-cover rounded shadow-sm">`;
@@ -239,49 +294,82 @@
                     : `<span class="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-medium mr-1">写真</span>`;
 
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${previewHtml}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title="${data.originalName}">
-                        ${typeBadge}${data.originalName}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${dateDisplay}<br><span class="text-xs text-gray-400 bg-gray-100 px-1 rounded">${data.dateSource}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        ${data.finalName}
-                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">${previewHtml}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate" title="${data.originalName}">${typeBadge}${data.originalName}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${formatBytes(data.size)}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${dateDisplay}<br><span class="text-xs text-gray-400 bg-gray-100 px-1 rounded">${data.dateSource}</span></td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">${data.finalName}</td>
                 `;
                 fileListBody.appendChild(row);
             });
         }
 
-        // ZIPファイルにまとめてダウンロード
-        downloadBtn.addEventListener('click', async () => {
+        saveFolderBtn.addEventListener('click', async () => {
             if (fileDataList.length === 0) return;
+
+            try {
+                // 保存先のフォルダを選択
+                const dirHandle = await window.showDirectoryPicker();
+                showLoading("ファイルをフォルダに保存中...", "1ファイルずつ書き込んでいます");
+
+                let count = 0;
+                for (const data of fileDataList) {
+                    count++;
+                    showLoading("ファイルをフォルダに保存中...", `(${count}/${fileDataList.length}) ${data.finalName}`);
+                    
+                    const newFileHandle = await dirHandle.getFileHandle(data.finalName, { create: true });
+                    const writable = await newFileHandle.createWritable();
+                    await writable.write(data.originalFile);
+                    await writable.close();
+                }
+
+                hideLoading();
+                showNoticeModal("保存完了", `${fileDataList.length} 件のファイルを指定のフォルダへ直接書き込みました！`, false);
+
+            } catch (error) {
+                hideLoading();
+                if (error.name !== 'AbortError') {
+                    console.error("フォルダ保存エラー:", error);
+                    showNoticeModal("保存失敗", "フォルダへの保存中にエラーが発生しました: " + error.message, true);
+                }
+            }
+        });
+
+        downloadZipBtn.addEventListener('click', async () => {
+            if (fileDataList.length === 0) return;
+
+            const totalBytes = fileDataList.reduce((acc, f) => acc + f.size, 0);
             
-            showLoading("ZIPファイルを作成中...");
+            // 800MBを超える場合はブラウザのメモリ上限警告を表示
+            if (totalBytes > 800 * 1024 * 1024) {
+                const mbSize = Math.round(totalBytes / (1024 * 1024));
+                showNoticeModal(
+                    "容量が大きいご注意",
+                    `選択したファイルの合計が ${mbSize}MB あり、ブラウザのメモリ制限を超える可能性があります。\n\nもしZIP作成が途中で失敗する場合は、「📁 フォルダに直接保存」または「📄 個別保存」をお試しください。`,
+                    true
+                );
+            }
+            
+            showLoading("ZIPファイルを作成中...", "大容量の動画が含まれる場合は時間がかかることがあります");
             
             try {
                 const zip = new JSZip();
-                
                 fileDataList.forEach(data => {
                     zip.file(data.finalName, data.originalFile);
                 });
                 
-                // 無圧縮(STORE)モードを指定して処理速度を大幅に向上 & 進捗(%)を表示
                 const content = await zip.generateAsync({ 
                     type: "blob",
                     compression: "STORE" 
                 }, (metadata) => {
-                    showLoading(`ZIPファイルを作成中... (${Math.round(metadata.percent)}%)`);
+                    showLoading(`ZIPファイルを作成中... (${Math.round(metadata.percent)}%)`, metadata.currentFile ? `追加中: ${metadata.currentFile}` : '');
                 });
                 
-                // ダウンロードトリガー
+                // ダウンロード処理
                 const url = window.URL.createObjectURL(content);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `renamed_photos_${formatDate(new Date())}.zip`;
+                a.download = `renamed_media_${formatDate(new Date())}.zip`;
                 document.body.appendChild(a);
                 a.click();
                 
@@ -290,22 +378,51 @@
                 
             } catch (error) {
                 console.error("ZIP生成エラー:", error);
-                alert("ZIPファイルの作成に失敗しました。");
+                hideLoading();
+                showNoticeModal(
+                    "ZIP作成に失敗しました", 
+                    "ファイル容量が大きく、ブラウザのメモリ上限に達した可能性があります。\n\n「📁 フォルダに直接保存」ボタン（Chrome/Edge推奨）をご利用いただくか、「📄 個別保存」をお試しください。", 
+                    true
+                );
             } finally {
                 hideLoading();
             }
         });
 
-        // クリアボタン
+        downloadSingleBtn.addEventListener('click', async () => {
+            if (fileDataList.length === 0) return;
+
+            showLoading("ファイルを個別にダウンロード中...", "");
+
+            for (let i = 0; i < fileDataList.length; i++) {
+                const data = fileDataList[i];
+                showLoading(`ダウンロード中... (${i + 1}/${fileDataList.length})`, data.finalName);
+
+                const url = URL.createObjectURL(data.originalFile);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.finalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // ブラウザの同時ダウンロードブロックを防ぐための微小ウェイト
+                await new Promise(r => setTimeout(r, 400));
+            }
+
+            hideLoading();
+        });
+
         clearBtn.addEventListener('click', () => {
-            // メモリ解放
             fileDataList.forEach(data => URL.revokeObjectURL(data.thumbUrl));
             fileDataList = [];
             updateUI();
         });
 
-        function showLoading(text) {
+        function showLoading(text, subtext = "") {
             loadingText.textContent = text;
+            loadingSubtext.textContent = subtext;
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
         }
@@ -314,6 +431,25 @@
             loadingOverlay.classList.add('hidden');
             loadingOverlay.classList.remove('flex');
         }
+
+        function showNoticeModal(title, message, isError = true) {
+            noticeTitle.textContent = title;
+            noticeMessage.textContent = message;
+            
+            if (isError) {
+                noticeIcon.className = "p-2 rounded-full bg-amber-100 text-amber-600";
+            } else {
+                noticeIcon.className = "p-2 rounded-full bg-green-100 text-green-600";
+            }
+
+            noticeModal.classList.remove('hidden');
+            noticeModal.classList.add('flex');
+        }
+
+        noticeCloseBtn.addEventListener('click', () => {
+            noticeModal.classList.add('hidden');
+            noticeModal.classList.remove('flex');
+        });
     </script>
 </body>
 </html>
