@@ -1,557 +1,212 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>写真・動画 日付一括リネーム (Web版)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- EXIF情報を読み取るためのライブラリ(exifr) -->
-    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
-    <!-- ZIPファイルを作成するためのライブラリ(JSZip) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .dragover { background-color: #eff6ff; border-color: #3b82f6; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>高速ファイル直打ちリネーム</title>
+  <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background-color: #f8fafc;
+      color: #1e293b;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .btn {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.2s;
+    }
+    .btn:hover { background-color: #1d4ed8; }
+    .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+    .btn-success { background-color: #16a34a; }
+    .btn-success:hover { background-color: #15803d; }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 14px;
+    }
+    th { background-color: #f1f5f9; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .badge-image { background: #dbeafe; color: #1e40af; }
+    .badge-video { background: #fce7f3; color: #9d174d; }
+    .status-ok { color: #16a34a; font-weight: bold; }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+<body>
 
-    <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-8">
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📸🎥 写真・動画 日付一括リネーム</h1>
-            <p class="text-gray-500 text-sm">撮影・作成日時（Exif/メタデータ）を自動解析し、「YYYYMMDD_HHMMSS」形式に一括変更します。<br>※ファイルは外部に送信されず、すべてお使いの端末内で安全に処理されます。</p>
-        </header>
+<div class="card">
+  <h2>📁 写真・動画の即時リネーム（直接書き換え）</h2>
+  <p>指定したフォルダ内のファイル名を、データコピーやダウンロード保存なしで直接書き換えます。</p>
+  
+  <div style="margin-bottom: 20px; display: flex; gap: 12px;">
+    <button id="btnSelect" class="btn">1. フォルダを選択</button>
+    <button id="btnRename" class="btn btn-success" disabled>2. この内容で一括リネーム実行</button>
+  </div>
 
-        <!-- 直接リネーム推進バナー (PC・対応ブラウザ向け) -->
-        <div id="direct-rename-banner" class="mb-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="space-y-1 text-center md:text-left">
-                <div class="inline-flex items-center gap-2 bg-emerald-700 bg-opacity-40 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-emerald-100">
-                    ⚡ おすすめ・待ち時間ゼロ
-                </div>
-                <h2 class="text-xl font-bold">フォルダを選んでその場で直接リネーム</h2>
-                <p class="text-xs text-emerald-100 leading-relaxed">ダウンロードやZIP作成が不要！パソコン上のファイルを直接書き換えるため、大容量動画も一瞬で変更完了します。</p>
-            </div>
-            <button id="direct-folder-btn" class="w-full md:w-auto px-6 py-3.5 bg-white text-emerald-700 font-bold text-base rounded-xl hover:bg-emerald-50 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
-                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-                フォルダを開いて直接変更
-            </button>
-        </div>
+  <div id="progressText" style="font-weight: bold; color: #2563eb; margin-bottom: 10px;"></div>
 
-        <!-- ドロップエリア (従来型/フォールバック) -->
-        <div class="relative mb-8">
-            <div class="absolute -top-3 left-4 bg-white px-2 text-xs font-bold text-gray-400 uppercase tracking-wider">または ファイルをドラッグ＆ドロップ</div>
-            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-colors duration-200 cursor-pointer hover:bg-gray-50">
-                <input type="file" id="file-input" multiple accept="image/*, video/*, .mp4, .mov, .avi, .mkv, .webm, .m4v, .3gp" class="hidden">
-                <svg class="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" />
-                </svg>
-                <p class="text-base font-medium text-gray-700 mb-1">個別のファイルをここにドロップ（読み込んで複製保存）</p>
-                <p class="text-xs text-gray-400">クリックして選択も可能 (JPG, PNG, HEIC, MP4, MOV 等)</p>
-            </div>
-        </div>
+  <table>
+    <thead>
+      <tr>
+        <th>種類</th>
+        <th>現在のファイル名</th>
+        <th>新しいファイル名（撮影/作成日時）</th>
+        <th>状態</th>
+      </tr>
+    </thead>
+    <tbody id="fileList">
+      <tr><td colspan="4" style="text-align:center; color:#64748b;">フォルダを選択してください</td></tr>
+    </tbody>
+  </table>
+</div>
 
-        <!-- コントロールパネル -->
-        <div id="control-panel" class="hidden mb-6 flex flex-col md:flex-row justify-between items-center bg-gray-100 p-4 rounded-xl gap-4">
-            <div>
-                <p class="text-gray-800 font-bold text-sm">解析完了: <span id="file-count" class="text-blue-600 font-extrabold text-base">0</span> 件</p>
-                <p class="text-xs text-gray-500 mt-0.5">合計サイズ: <span id="total-size">0 MB</span> | モード: <span id="current-mode-badge" class="font-semibold text-emerald-600">直接リネーム</span></p>
-            </div>
-            <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end">
-                <button id="clear-btn" class="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-                    クリア
-                </button>
-                
-                <!-- 直接リネーム実行ボタン (フォルダ直接参照時) -->
-                <button id="exec-direct-rename-btn" class="hidden px-5 py-2.5 bg-emerald-600 text-white font-bold text-sm rounded-lg hover:bg-emerald-700 transition-colors shadow flex items-center gap-1.5 animate-pulse">
-                    ⚡ 変更を今すぐ適用（超高速）
-                </button>
+<script>
+  let dirHandle = null;
+  const filesToRename = [];
 
-                <!-- ZIP保存ボタン (ドロップ時用) -->
-                <button id="download-zip-btn" class="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1.5">
-                    📦 ZIPで保存
-                </button>
-                <!-- 個別保存ボタン -->
-                <button id="download-single-btn" class="px-3 py-2 bg-gray-200 text-gray-800 font-medium text-sm rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-1">
-                    📄 個別保存
-                </button>
-            </div>
-        </div>
+  const btnSelect = document.getElementById('btnSelect');
+  const btnRename = document.getElementById('btnRename');
+  const fileList = document.getElementById('fileList');
+  const progressText = document.getElementById('progressText');
 
-        <!-- ファイルリストテーブル -->
-        <div id="file-list-container" class="hidden overflow-x-auto rounded-lg border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">プレビュー</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">元のファイル名</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ファイルサイズ</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">撮影/作成日時</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-emerald-600 uppercase tracking-wider">新しいファイル名</th>
-                    </tr>
-                </thead>
-                <tbody id="file-list-body" class="bg-white divide-y divide-gray-200">
-                    <!-- JSで動的に追加 -->
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- ローディングオーバーレイ -->
-        <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-60 hidden flex-col items-center justify-center z-50 text-white p-4 backdrop-blur-sm">
-            <svg class="animate-spin h-12 w-12 text-emerald-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p id="loading-text" class="text-xl font-bold text-center">処理中...</p>
-            <p id="loading-subtext" class="text-sm text-gray-300 mt-2 text-center"></p>
-        </div>
+  // フォルダ選択処理
+  btnSelect.addEventListener('click', async () => {
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      filesToRename.length = 0;
+      fileList.innerHTML = '';
+      progressText.textContent = 'ファイルを解析中...';
 
-        <!-- カスタム通知モーダル -->
-        <div id="notice-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl transform transition-all">
-                <div class="flex items-center gap-3 mb-4">
-                    <div id="notice-icon" class="p-2 rounded-full bg-emerald-100 text-emerald-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <h3 id="notice-title" class="text-lg font-bold text-gray-900">通知</h3>
-                </div>
-                <p id="notice-message" class="text-sm text-gray-600 leading-relaxed mb-6 whitespace-pre-line"></p>
-                <div class="flex justify-end">
-                    <button id="notice-close-btn" class="px-5 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 transition-colors text-sm">
-                        閉じる
-                    </button>
-                </div>
-            </div>
-        </div>
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+          
+          if (['.jpg', '.jpeg', '.png', '.mp4', '.mov', '.m4v', '.webm', '.avi'].includes(ext)) {
+            const date = await getFileDate(file);
+            const newName = formatDate(date) + ext;
 
-    </div>
-
-    <script>
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const directFolderBtn = document.getElementById('direct-folder-btn');
-        const controlPanel = document.getElementById('control-panel');
-        const fileListContainer = document.getElementById('file-list-container');
-        const fileListBody = document.getElementById('file-list-body');
-        const fileCountSpan = document.getElementById('file-count');
-        const totalSizeSpan = document.getElementById('total-size');
-        const currentModeBadge = document.getElementById('current-mode-badge');
-        const clearBtn = document.getElementById('clear-btn');
-        const execDirectRenameBtn = document.getElementById('exec-direct-rename-btn');
-        const downloadZipBtn = document.getElementById('download-zip-btn');
-        const downloadSingleBtn = document.getElementById('download-single-btn');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const loadingText = document.getElementById('loading-text');
-        const loadingSubtext = document.getElementById('loading-subtext');
-
-        // モーダル要素
-        const noticeModal = document.getElementById('notice-modal');
-        const noticeTitle = document.getElementById('notice-title');
-        const noticeMessage = document.getElementById('notice-message');
-        const noticeIcon = document.getElementById('notice-icon');
-        const noticeCloseBtn = document.getElementById('notice-close-btn');
-
-        let fileDataList = [];
-        let isDirectMode = false;
-        let currentDirHandle = null;
-
-        // File System Access API非対応ブラウザ（Safari等）の場合、直接フォルダ選択を非表示
-        if (!('showDirectoryPicker' in window)) {
-            document.getElementById('direct-rename-banner').classList.add('hidden');
-        }
-
-        function formatDate(date) {
-            if (!date || isNaN(date.getTime())) return null;
-            const pad = (n) => n.toString().padStart(2, '0');
-            return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-        }
-
-        function getExtension(filename) {
-            return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
-        }
-
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // フォルダを直接開いて元のファイルを書き換えるモード
-        directFolderBtn.addEventListener('click', async () => {
-            try {
-                // 読み書き権限付きでフォルダを選択
-                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                showLoading("フォルダ内のファイルを解析中...", "撮影日時情報を検索しています");
-
-                fileDataList = [];
-                currentDirHandle = dirHandle;
-                isDirectMode = true;
-
-                for await (const entry of dirHandle.values()) {
-                    if (entry.kind === 'file') {
-                        const file = await entry.getFile();
-                        const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|heic|webp|tif|tiff)$/i.test(file.name);
-                        const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i.test(file.name);
-
-                        if (isImage || isVideo) {
-                            let dateObj = null;
-                            let dateSource = "更新日時";
-
-                            try {
-                                const exifData = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'CreationDate', 'MediaCreateDate'] });
-                                if (exifData) {
-                                    const rawDate = exifData.DateTimeOriginal || exifData.CreateDate || exifData.CreationDate || exifData.MediaCreateDate;
-                                    if (rawDate) {
-                                        dateObj = new Date(rawDate);
-                                        dateSource = isImage ? "Exif撮影日時" : "動画作成日時";
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn(`Exif読み込み失敗 (${file.name}):`, e);
-                            }
-
-                            if (!dateObj || isNaN(dateObj.getTime())) {
-                                dateObj = new Date(file.lastModified);
-                            }
-
-                            const ext = getExtension(file.name);
-                            const dateStr = formatDate(dateObj);
-                            const proposedName = dateStr ? `${dateStr}.${ext}` : file.name;
-
-                            fileDataList.push({
-                                handle: entry,
-                                originalFile: file,
-                                originalName: file.name,
-                                size: file.size,
-                                date: dateObj,
-                                dateSource: dateSource,
-                                proposedName: proposedName,
-                                finalName: proposedName,
-                                thumbUrl: URL.createObjectURL(file),
-                                isVideo: isVideo
-                            });
-                        }
-                    }
-                }
-
-                if (fileDataList.length === 0) {
-                    hideLoading();
-                    showNoticeModal("対象ファイルがありません", "選択したフォルダ内に画像や動画ファイルが見つかりませんでした。", true);
-                    return;
-                }
-
-                resolveNameCollisions();
-                updateUI();
-                hideLoading();
-
-            } catch (error) {
-                hideLoading();
-                if (error.name !== 'AbortError') {
-                    console.error("フォルダ読み込みエラー:", error);
-                    showNoticeModal("エラー", "フォルダのオープンに失敗しました: " + error.message, true);
-                }
-            }
-        });
-
-        // 超高速：直接リネームの実行ボタン
-        execDirectRenameBtn.addEventListener('click', async () => {
-            if (!isDirectMode || !currentDirHandle || fileDataList.length === 0) return;
-
-            showLoading("リネーム処理中...", "ファイルを直接書き換えています（待ち時間ゼロ）");
-
-            let successCount = 0;
-            for (let i = 0; i < fileDataList.length; i++) {
-                const item = fileDataList[i];
-                
-                // 変更の必要がない場合はスキップ
-                if (item.originalName === item.finalName) continue;
-
-                showLoading(`リネーム中... (${i + 1}/${fileDataList.length})`, item.finalName);
-
-                try {
-                    // Chromium標準の handle.move() によるインプレース高速名変更
-                    if (typeof item.handle.move === 'function') {
-                        await item.handle.move(item.finalName);
-                        successCount++;
-                    } else {
-                        // move未実装ブラウザ向けフォールバック
-                        const newFileHandle = await currentDirHandle.getFileHandle(item.finalName, { create: true });
-                        const writable = await newFileHandle.createWritable();
-                        await writable.write(item.originalFile);
-                        await writable.close();
-                        await currentDirHandle.removeEntry(item.originalName);
-                        successCount++;
-                    }
-                } catch (err) {
-                    console.error(`リネーム失敗 (${item.originalName}):`, err);
-                }
-            }
-
-            hideLoading();
-            showNoticeModal("リネーム完了！", `フォルダ内の ${successCount} 件のファイル名を直接変更しました。\nコピー保存不要のため瞬時に完了しました！`, false);
-
-            // リセット
-            fileDataList.forEach(data => URL.revokeObjectURL(data.thumbUrl));
-            fileDataList = [];
-            updateUI();
-        });
-
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                isDirectMode = false;
-                processFiles(e.dataTransfer.files);
-            }
-        });
-
-        dropZone.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                isDirectMode = false;
-                processFiles(e.target.files);
-            }
-        });
-
-        async function processFiles(files) {
-            showLoading("ファイルの日付情報を解析中...", "メタデータを読み込んでいます");
-            
-            const newFiles = Array.from(files);
-
-            for (const file of newFiles) {
-                const isImage = file.type.startsWith('image/');
-                const isVideo = file.type.startsWith('video/');
-                if (!isImage && !isVideo) continue;
-
-                let dateObj = null;
-                let dateSource = "更新日時";
-
-                try {
-                    const exifData = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'CreationDate', 'MediaCreateDate'] });
-                    if (exifData) {
-                        const rawDate = exifData.DateTimeOriginal || exifData.CreateDate || exifData.CreationDate || exifData.MediaCreateDate;
-                        if (rawDate) {
-                            dateObj = new Date(rawDate);
-                            dateSource = isImage ? "Exif撮影日時" : "動画作成日時";
-                        }
-                    }
-                } catch (error) {
-                    console.warn(`メタデータ読み込みエラー (${file.name}):`, error);
-                }
-
-                if (!dateObj || isNaN(dateObj.getTime())) {
-                    dateObj = new Date(file.lastModified);
-                }
-
-                const ext = getExtension(file.name);
-                const dateStr = formatDate(dateObj);
-                const proposedName = dateStr ? `${dateStr}.${ext}` : file.name;
-
-                fileDataList.push({
-                    originalFile: file,
-                    originalName: file.name,
-                    size: file.size,
-                    date: dateObj,
-                    dateSource: dateSource,
-                    proposedName: proposedName,
-                    finalName: proposedName,
-                    thumbUrl: URL.createObjectURL(file),
-                    isVideo: isVideo
-                });
-            }
-
-            resolveNameCollisions();
-            updateUI();
-            hideLoading();
-            fileInput.value = "";
-        }
-
-        function resolveNameCollisions() {
-            const usedNames = new Set();
-            const existingNames = new Set(fileDataList.map(f => f.originalName));
-
-            fileDataList.forEach(data => {
-                const ext = getExtension(data.proposedName);
-                const baseName = data.proposedName.substring(0, data.proposedName.lastIndexOf('.')) || data.proposedName;
-                
-                let candidate = data.proposedName;
-                let counter = 1;
-
-                while (usedNames.has(candidate) || (candidate !== data.originalName && existingNames.has(candidate))) {
-                    candidate = `${baseName}_${counter}.${ext}`;
-                    counter++;
-                }
-
-                data.finalName = candidate;
-                usedNames.add(candidate);
+            filesToRename.push({
+              handle: entry,
+              oldName: file.name,
+              newName: newName,
+              type: ['.jpg', '.jpeg', '.png'].includes(ext) ? '写真' : '動画',
+              statusCell: null
             });
+          }
         }
+      }
 
-        function updateUI() {
-            if (fileDataList.length === 0) {
-                controlPanel.classList.add('hidden');
-                fileListContainer.classList.add('hidden');
-                return;
-            }
+      renderList();
+      progressText.textContent = `${filesToRename.length} 件の対象ファイルが見つかりました。`;
+      btnRename.disabled = filesToRename.length === 0;
 
-            const totalBytes = fileDataList.reduce((acc, f) => acc + f.size, 0);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('フォルダのアクセスに失敗しました: ' + err.message);
+      }
+    }
+  });
 
-            fileCountSpan.textContent = fileDataList.length;
-            totalSizeSpan.textContent = formatBytes(totalBytes);
+  // リネーム実行処理（データの書き出しを行わず即時リネーム）
+  btnRename.addEventListener('click', async () => {
+    if (!dirHandle || filesToRename.length === 0) return;
 
-            if (isDirectMode) {
-                currentModeBadge.textContent = "📁 フォルダ直接変更（保存不要）";
-                currentModeBadge.className = "font-bold text-emerald-600";
-                execDirectRenameBtn.classList.remove('hidden');
-                downloadZipBtn.classList.add('hidden');
-                downloadSingleBtn.classList.add('hidden');
-            } else {
-                currentModeBadge.textContent = "📄 ファイルドロップ（複製保存）";
-                currentModeBadge.className = "font-bold text-blue-600";
-                execDirectRenameBtn.classList.add('hidden');
-                downloadZipBtn.classList.remove('hidden');
-                downloadSingleBtn.classList.remove('hidden');
-            }
+    btnSelect.disabled = true;
+    btnRename.disabled = true;
+    let count = 0;
 
-            controlPanel.classList.remove('hidden');
-            fileListContainer.classList.remove('hidden');
-            
-            fileListBody.innerHTML = '';
-            
-            fileDataList.forEach((data) => {
-                const row = document.createElement('tr');
-                const dateDisplay = data.date ? data.date.toLocaleString() : '不明';
-                
-                const previewHtml = data.isVideo
-                    ? `<video src="${data.thumbUrl}" class="h-12 w-12 object-cover rounded shadow-sm bg-black" muted preload="metadata"></video>`
-                    : `<img src="${data.thumbUrl}" alt="preview" class="h-12 w-12 object-cover rounded shadow-sm">`;
-
-                const typeBadge = data.isVideo
-                    ? `<span class="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-medium mr-1">動画</span>`
-                    : `<span class="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-medium mr-1">写真</span>`;
-
-                row.innerHTML = `
-                    <td class="px-4 py-3 whitespace-nowrap">${previewHtml}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate" title="${data.originalName}">${typeBadge}${data.originalName}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${formatBytes(data.size)}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${dateDisplay}<br><span class="text-xs text-gray-400 bg-gray-100 px-1 rounded">${data.dateSource}</span></td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-emerald-600">${data.finalName}</td>
-                `;
-                fileListBody.appendChild(row);
-            });
+    for (const item of filesToRename) {
+      try {
+        if (item.oldName !== item.newName) {
+          // File System Access APIのmove機能でディスク上の名前を直接変更
+          await item.handle.move(item.newName);
         }
+        item.statusCell.innerHTML = '<span class="status-ok">完了</span>';
+        count++;
+        progressText.textContent = `リネーム中... (${count} / ${filesToRename.length})`;
+      } catch (err) {
+        item.statusCell.textContent = 'エラー: ' + err.message;
+      }
+    }
 
-        downloadZipBtn.addEventListener('click', async () => {
-            if (fileDataList.length === 0) return;
+    progressText.textContent = `処理が完了しました！（${count} 件）`;
+    btnSelect.disabled = false;
+  });
 
-            showLoading("ZIPファイルを作成中...", "解凍・圧縮を行わずにまとめます");
-            
-            try {
-                const zip = new JSZip();
-                fileDataList.forEach(data => {
-                    zip.file(data.finalName, data.originalFile);
-                });
-                
-                const content = await zip.generateAsync({ 
-                    type: "blob",
-                    compression: "STORE" 
-                }, (metadata) => {
-                    showLoading(`ZIPファイルを作成中... (${Math.round(metadata.percent)}%)`, metadata.currentFile ? `追加中: ${metadata.currentFile}` : '');
-                });
-                
-                const url = window.URL.createObjectURL(content);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `renamed_media_${formatDate(new Date())}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-            } catch (error) {
-                console.error("ZIP生成エラー:", error);
-                hideLoading();
-                showNoticeModal("ZIP作成エラー", "「📁 フォルダを選んで直接リネーム」機能をご利用いただくと、ZIP作成なしで一瞬で完了します。", true);
-            } finally {
-                hideLoading();
-            }
+  // 日時取得 (Exif優先、無ければ最終更新日)
+  function getFileDate(file) {
+    return new Promise((resolve) => {
+      if (file.type.startsWith('image/jpeg')) {
+        EXIF.getData(file, function() {
+          const exifDate = EXIF.getTag(this, 'DateTimeOriginal');
+          if (exifDate) {
+            const parts = exifDate.split(' ');
+            const dateParts = parts[0].split(':');
+            const timeParts = parts[1].split(':');
+            resolve(new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], timeParts[2]));
+            return;
+          }
+          resolve(new Date(file.lastModified));
         });
+      } else {
+        resolve(new Date(file.lastModified));
+      }
+    });
+  }
 
-        downloadSingleBtn.addEventListener('click', async () => {
-            if (fileDataList.length === 0) return;
+  // 日時フォーマット (YYYYMMDD_HHMMSS)
+  function formatDate(d) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  }
 
-            showLoading("ファイルを個別にダウンロード中...", "");
+  // 一覧表示
+  function renderList() {
+    fileList.innerHTML = '';
+    filesToRename.forEach(item => {
+      const tr = document.createElement('tr');
+      const badgeClass = item.type === '写真' ? 'badge-image' : 'badge-video';
+      
+      tr.innerHTML = `
+        <td><span class="badge ${badgeClass}">${item.type}</span></td>
+        <td>${item.oldName}</td>
+        <td><b>${item.newName}</b></td>
+        <td>待機中</td>
+      `;
+      item.statusCell = tr.children[3];
+      fileList.appendChild(tr);
+    });
+  }
+</script>
 
-            for (let i = 0; i < fileDataList.length; i++) {
-                const data = fileDataList[i];
-                showLoading(`ダウンロード中... (${i + 1}/${fileDataList.length})`, data.finalName);
-
-                const url = URL.createObjectURL(data.originalFile);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = data.finalName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                await new Promise(r => setTimeout(r, 300));
-            }
-
-            hideLoading();
-        });
-
-        clearBtn.addEventListener('click', () => {
-            fileDataList.forEach(data => URL.revokeObjectURL(data.thumbUrl));
-            fileDataList = [];
-            currentDirHandle = null;
-            updateUI();
-        });
-
-        function showLoading(text, subtext = "") {
-            loadingText.textContent = text;
-            loadingSubtext.textContent = subtext;
-            loadingOverlay.classList.remove('hidden');
-            loadingOverlay.classList.add('flex');
-        }
-
-        function hideLoading() {
-            loadingOverlay.classList.add('hidden');
-            loadingOverlay.classList.remove('flex');
-        }
-
-        function showNoticeModal(title, message, isError = true) {
-            noticeTitle.textContent = title;
-            noticeMessage.textContent = message;
-            
-            if (isError) {
-                noticeIcon.className = "p-2 rounded-full bg-amber-100 text-amber-600";
-            } else {
-                noticeIcon.className = "p-2 rounded-full bg-emerald-100 text-emerald-600";
-            }
-
-            noticeModal.classList.remove('hidden');
-            noticeModal.classList.add('flex');
-        }
-
-        noticeCloseBtn.addEventListener('click', () => {
-            noticeModal.classList.add('hidden');
-            noticeModal.classList.remove('flex');
-        });
-    </script>
 </body>
 </html>
