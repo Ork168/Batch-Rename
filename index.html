@@ -18,18 +18,18 @@
 
     <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📸 写真日付一括リネーム</h1>
-            <p class="text-gray-500 text-sm">写真のExifデータ（撮影日時）を読み取り、ファイル名を「YYYYMMDD_HHMMSS」形式に一括変換します。<br>※すべてブラウザ内で処理されるため、画像は外部に送信されず安全です。</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📸🎥 写真・動画 日付一括リネーム</h1>
+            <p class="text-gray-500 text-sm">写真や動画のExif/メタデータ（撮影・作成日時）を読み取り、ファイル名を「YYYYMMDD_HHMMSS」形式に一括変換します。<br>※すべてブラウザ内で処理されるため、ファイルは外部に送信されず安全です。</p>
         </header>
 
         <!-- ドロップエリア -->
         <div id="drop-zone" class="border-4 border-dashed border-gray-300 rounded-xl p-12 text-center transition-colors duration-200 cursor-pointer mb-8 hover:bg-gray-50">
-            <input type="file" id="file-input" multiple accept="image/jpeg, image/png, image/heic, image/webp" class="hidden">
+            <input type="file" id="file-input" multiple accept="image/*, video/*, .mp4, .mov, .avi, .mkv, .webm, .m4v, .3gp" class="hidden">
             <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" />
             </svg>
-            <p class="text-lg font-medium text-gray-700 mb-1">ここに写真ファイルをドロップ</p>
-            <p class="text-sm text-gray-500">またはクリックしてファイルを選択 (JPG, PNG, HEIC等)</p>
+            <p class="text-lg font-medium text-gray-700 mb-1">ここに写真や動画ファイルをドロップ</p>
+            <p class="text-sm text-gray-500">またはクリックしてファイルを選択 (JPG, PNG, HEIC, MP4, MOV 等)</p>
         </div>
 
         <!-- コントロールパネル (ファイル読み込み後に表示) -->
@@ -126,33 +126,35 @@
 
         // ファイルの処理とExif解析
         async function processFiles(files) {
-            showLoading("写真の撮影日時を解析中...");
+            showLoading("ファイルの日付情報を解析中...");
             
             const newFiles = Array.from(files);
             let processedCount = 0;
 
             for (const file of newFiles) {
-                // 画像ファイルのみ対象
-                if (!file.type.startsWith('image/')) continue;
+                // 画像または動画ファイルのみ対象
+                const isImage = file.type.startsWith('image/');
+                const isVideo = file.type.startsWith('video/');
+                if (!isImage && !isVideo) continue;
 
                 let dateObj = null;
                 let dateSource = "更新日時";
 
                 try {
-                    // exifrを使ってExif情報から撮影日時を取得
-                    const exifData = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate'] });
-                    if (exifData && exifData.DateTimeOriginal) {
-                        dateObj = new Date(exifData.DateTimeOriginal);
-                        dateSource = "Exif撮影日時";
-                    } else if (exifData && exifData.CreateDate) {
-                        dateObj = new Date(exifData.CreateDate);
-                        dateSource = "Exif作成日時";
+                    // exifrを使ってExif/メタデータから撮影・作成日時を取得
+                    const exifData = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'CreationDate', 'MediaCreateDate'] });
+                    if (exifData) {
+                        const rawDate = exifData.DateTimeOriginal || exifData.CreateDate || exifData.CreationDate || exifData.MediaCreateDate;
+                        if (rawDate) {
+                            dateObj = new Date(rawDate);
+                            dateSource = isImage ? "Exif撮影日時" : "動画作成日時";
+                        }
                     }
                 } catch (error) {
-                    console.warn(`Exif読み込みエラー (${file.name}):`, error);
+                    console.warn(`メタデータ読み込みエラー (${file.name}):`, error);
                 }
 
-                // Exifがない場合はファイルの最終更新日時を使用
+                // メタデータがない場合はファイルの最終更新日時を使用
                 if (!dateObj || isNaN(dateObj.getTime())) {
                     dateObj = new Date(file.lastModified);
                 }
@@ -171,7 +173,8 @@
                     dateSource: dateSource,
                     proposedName: proposedName,
                     finalName: proposedName,
-                    thumbUrl: thumbUrl
+                    thumbUrl: thumbUrl,
+                    isVideo: isVideo
                 });
 
                 processedCount++;
@@ -226,12 +229,21 @@
                 const row = document.createElement('tr');
                 const dateDisplay = data.date ? data.date.toLocaleString() : '不明';
                 
+                // プレビュー表示（動画と画像で分岐）
+                const previewHtml = data.isVideo
+                    ? `<video src="${data.thumbUrl}" class="h-12 w-12 object-cover rounded shadow-sm bg-black" muted preload="metadata"></video>`
+                    : `<img src="${data.thumbUrl}" alt="preview" class="h-12 w-12 object-cover rounded shadow-sm">`;
+
+                const typeBadge = data.isVideo
+                    ? `<span class="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-medium mr-1">動画</span>`
+                    : `<span class="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-medium mr-1">写真</span>`;
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <img src="${data.thumbUrl}" alt="preview" class="h-12 w-12 object-cover rounded shadow-sm">
+                        ${previewHtml}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title="${data.originalName}">
-                        ${data.originalName}
+                        ${typeBadge}${data.originalName}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ${dateDisplay}<br><span class="text-xs text-gray-400 bg-gray-100 px-1 rounded">${data.dateSource}</span>
